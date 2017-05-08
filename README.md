@@ -1,21 +1,20 @@
-# Cloudformation stack to setup a SPA on s3, Cloudfront and AWS Certificate manager
+# Cheap and scalable setup to deploy a SPA on AWS
 
 [![MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 > This stack builds a setup to deploy a client side app on s3 with Cloudfront as a CDN and HTTPS using AWS Certificate Manager
 
-
 ## Getting started
 
 :unlock: Before using the makefile, you need `aws CLI` installed and configured (`aws configure --profile bigoudi`) and an user-account on the AWS account of Bigoudi with enough permissions to run the update.
 
-1 .`git clone git@github.com:NicolasRitouet/bigoudi.git`
-2. change bigoudi with your own project name
-3. change bigou.di with your own domain name
-4. if you don't have one, create a new AWS account
-5. create a new profile for the `AWS cli` with your AWS account
-6. modify params.json with your domain name and ARN certificate
-6. `make create-stack`
+- `git clone git@github.com:NicolasRitouet/bigoudi.git`
+- change bigoudi with your own project name
+- change bigou.di with your own domain name
+- if you don't have one, create a new AWS account
+- create a new profile for the `AWS cli` with your AWS account
+- modify params.json with your domain name and ARN certificate
+- `make create-stack`
 
 ## Cost
 
@@ -25,6 +24,8 @@ The main goal of this stack is to be cost-efficient and easily scalable.
 - Cloudfront will be almost free with a limited traffic (if the traffic increases, you'll be hopefully glad to pay a few $ more)
 - Route53 Hosted Zone (0.50$ per month)
 - AWS Certificate manager creates SSL certificates for free and automatically renewd by AWS
+
+In total, for a website with low traffic, the cost should be around 0.60$ per month.
 
 ## Resources
 
@@ -99,3 +100,7 @@ make describe-changeset CHANGESET-NAME=name-of-changeset
 ```bash
 make test
 ```
+
+## Contribution
+
+Feel free to send a PR.
