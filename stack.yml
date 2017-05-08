@@ -1,0 +1,145 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "Cloudformation Stack to manage bigou.di infrastructure"
+
+Parameters:
+  DomainRoot:
+    Description: "Root domain name for the Route53 records (aka APEX). Example: \"bigou.di\""
+    Type: String
+  SSLCertificateArn:
+    Description: "ARN of the SSL certificate"
+    Type: String
+
+Resources:
+  FrontendLogsBucket:
+    Type: "AWS::S3::Bucket"
+
+  FrontendBucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        ErrorDocument: 404.html
+        IndexDocument: index.html
+
+  WWWRedirectBucket:
+    Type: AWS::S3::Bucket
+    Description: "Aliased bucket to redirect www.domain.com to APEX"
+    Properties:
+      BucketName: !Join [".", [ "www", !Ref DomainRoot ]]
+      WebsiteConfiguration:
+        RedirectAllRequestsTo:
+          HostName: !Ref DomainRoot
+
+  CDN:
+    Type: "AWS::CloudFront::Distribution"
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        Logging:
+          IncludeCookies: 'false'
+          Bucket: !Sub "${FrontendLogsBucket}.s3.amazonaws.com"
+          Prefix: CDN
+        HttpVersion: http2
+        PriceClass: PriceClass_100
+        CustomErrorResponses:
+          - ErrorCachingMinTTL: 10
+            ErrorCode: 400
+          - ErrorCachingMinTTL: 30
+            ErrorCode: 403
+          - ErrorCachingMinTTL: 30
+            ErrorCode: 404
+        ViewerCertificate:
+          AcmCertificateArn: !Ref SSLCertificateArn
+          SslSupportMethod: sni-only
+        Aliases:
+          - !Join [".", [ "*", !Ref DomainRoot ]]
+          - !Ref DomainRoot
+        Origins:
+          - Id: s3origin
+            DomainName: !Sub "${FrontendBucket}.s3.amazonaws.com"
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginProtocolPolicy: http-only
+        DefaultCacheBehavior:
+          # Allows cachebusting with things like /css/site.css?h=3958efd
+          ForwardedValues:
+            QueryString: true
+          TargetOriginId: s3origin
+          ViewerProtocolPolicy: redirect-to-https
+
+  SiteDomainHostedZone:
+    Type: AWS::Route53::HostedZone
+    Properties:
+      HostedZoneConfig:
+        Comment: !Sub "Hosted Zone for ${DomainRoot} static site"
+      Name: !Ref DomainRoot
+
+  SiteDomainRecords:
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      HostedZoneName: !Sub "${DomainRoot}."
+      Comment: !Sub "DNS records associated with ${DomainRoot} static site"
+      RecordSets:
+        - Name: !Ref DomainRoot
+          Type: A
+          AliasTarget:
+            DNSName: !GetAtt CDN.DomainName
+            # magic cloudfront hosted zone id
+            # see http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-route53-aliastarget.html
+            HostedZoneId: Z2FDTNDATAQYW2
+        - Name: !Join [".", [ "www", !Ref DomainRoot ]]
+          Type: A
+          AliasTarget:
+            DNSName: "s3-website-eu-west-1.amazonaws.com"
+            HostedZoneId: "Z1BKCTXD74EZPE"
+        - Name: !Ref DomainRoot
+          Type: MX
+          TTL: 60
+          ResourceRecords:
+            - '1 aspmx.l.google.com.'
+            - '5 alt1.aspmx.l.google.com.'
+            - '5 alt2.aspmx.l.google.com.'
+
+  ContinousDeploymentBot:
+    Type: AWS::IAM::User
+
+  UploadFrontendBucketPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: UploadFrontendBucketPolicy
+      Users:
+      - !Ref ContinousDeploymentBot
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - 's3:PutObject'
+          - 's3:GetObject'
+          - 's3:DeleteObject'
+          - 's3:PutObjectAcl'
+          Resource: 
+            - !Join ['', ['arn:aws:s3:::', !Ref 'FrontendBucket']]
+            - !Join ['', ['arn:aws:s3:::', !Ref 'FrontendBucket', /*]]
+
+  ContinousDeploymentBotAccessKey:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName: !Ref ContinousDeploymentBot
+
+Outputs:
+  CdnDns:
+    Value: !GetAtt CDN.DomainName
+    Export:
+      Name: !Sub '${AWS::StackName}-CdnDns'
+  FrontendBucketName:
+    Value: !Ref FrontendBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-FrontendBucketName'
+  ContinousDeploymentBotAccessKey:
+    Value: !Ref ContinousDeploymentBotAccessKey
+    Export:
+      Name: !Sub '${AWS::StackName}-ContinousDeploymentBotAccessKey'

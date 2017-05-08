@@ -1,0 +1,19 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "Stack to manage SSL certificate on bigoudi"
+
+Resources:
+  SSLCert:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: bigou.di
+      SubjectAlternativeNames:
+        - '*.bigou.di'
+        - '*.bigoudi.com'
+        - bigoudi.com
+
+Outputs:
+  SSLCert:
+    Value: !Ref SSLCert
+    Export:
+      Name: !Sub '${AWS::StackName}-SSLCert'

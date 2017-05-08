@@ -1,0 +1,5 @@
+[
+
+  { "ParameterKey": "DomainRoot", "ParameterValue": "bigou.di" },
+  { "ParameterKey": "SSLCertificateArn", "ParameterValue": "arn:aws:acm:us-east-1:071774786339:certificate/2a5346549-76542-496546b-45610-a63365477ea4f" }
+]
